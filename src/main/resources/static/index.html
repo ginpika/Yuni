@@ -241,24 +241,7 @@
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen">
-    <div id="sessionSelectorArea" class="fixed top-0 left-0 right-0 flex justify-center z-40">
-        <div id="sessionTrigger" class="flex flex-col items-center cursor-pointer group w-[500px]" onmouseenter="showSessionDropdown()" onmouseleave="hideSessionDropdownTimer()">
-            <svg class="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-            </svg>
-            <span id="currentSessionLabel" class="text-xs text-slate-400 group-hover:text-slate-600 truncate max-w-[480px] transition-colors" data-i18n="newConversation">新对话</span>
-        </div>
-        <div id="sessionDropdown" class="hidden absolute top-full mt-2 w-[500px] bg-white rounded-md shadow-sm border border-slate-200 z-50" onmouseenter="cancelHideSessionDropdown()" onmouseleave="hideSessionDropdown()">
-            <div id="sessionList" class="max-h-72 overflow-y-auto py-1"></div>
-            <div id="loadMoreBtn" class="hidden border-t border-slate-100">
-                <button onclick="loadMoreSessions()" class="w-full px-3 py-2 text-xs text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors text-center" data-i18n="loadMore">
-                    加载更多
-                </button>
-            </div>
-        </div>
-    </div>
-    
-    <div class="max-w-[1100px] min-w-[800px] mx-auto p-4 h-screen flex flex-col">
+    <div class="max-w-[800px] min-w-[800px] mx-auto p-4 h-screen flex flex-col">
         <header class="flex items-center justify-between py-3 mb-3">
             <div class="flex items-center gap-2.5">
                 <div class="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
@@ -278,10 +261,9 @@
             <div class="flex items-center gap-1.5">
                 <a href="/database.html" class="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1.5" data-i18n-title="databaseTitle">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 1.1.9 2.63L4 17h16M4 17l4-4M4 7zm0 0l4-4m4 4-4 4M4 7z"/>
-                        <circle cx="8" cy="11" r="1.5"/>
-                        <circle cx="12" cy="11" r="1.5"/>
-                        <circle cx="16" cy="11" r="1.5"/>
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
                     </svg>
                     <span data-i18n="database">数据库</span>
                 </a>
@@ -332,12 +314,40 @@
             </div>
         </div>
 
-        <div id="chatContainer" class="chat-container overflow-y-auto scrollbar-thin bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-            <div class="flex items-center justify-center py-8 text-slate-400">
-                <svg class="w-5 h-5 mr-2 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                <span data-i18n="loadingHistory">加载历史消息...</span>
+        <div class="flex-1 relative mb-3 min-h-0">
+            <div id="chatContainer" class="chat-container h-full overflow-y-auto scrollbar-thin bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+                <div class="flex items-center justify-center py-8 text-slate-400">
+                    <svg class="w-5 h-5 mr-2 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span data-i18n="loadingHistory">加载历史消息...</span>
+                </div>
+            </div>
+            
+            <div class="absolute right-[-52px] top-0 flex flex-col gap-2">
+                <div id="toolFab" onclick="toggleToolModal()" class="w-10 h-10 bg-white rounded-full shadow-md border border-slate-200 flex items-center justify-center cursor-pointer hover:bg-slate-50 hover:shadow-lg transition-all z-30">
+                    <svg class="w-5 h-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                    </svg>
+                </div>
+                
+                <div id="sessionFab" onclick="toggleSessionDropdown()" class="w-10 h-10 bg-white rounded-full shadow-md border border-slate-200 flex items-center justify-center cursor-pointer hover:bg-slate-50 hover:shadow-lg transition-all z-30">
+                    <svg class="w-5 h-5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                </div>
+            </div>
+            
+            <div id="sessionDropdown" class="hidden absolute right-[-280px] top-12 w-[260px] bg-white rounded-md shadow-lg border border-slate-200 z-50">
+                <div class="px-3 py-2 border-b border-slate-100">
+                    <span class="text-sm font-medium text-slate-700" data-i18n="sessionList">会话列表</span>
+                </div>
+                <div id="sessionList" class="max-h-72 overflow-y-auto py-1"></div>
+                <div id="loadMoreBtn" class="hidden border-t border-slate-100">
+                    <button onclick="loadMoreSessions()" class="w-full px-3 py-2 text-xs text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors text-center" data-i18n="loadMore">
+                        加载更多
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -365,6 +375,36 @@
                     </svg>
                 </button>
             </form>
+        </div>
+    </div>
+
+    <div id="toolModal" class="hidden fixed inset-0 z-50">
+        <div class="modal-overlay absolute inset-0 bg-black/30" onclick="closeToolModal()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="modal-content bg-white rounded-xl shadow-xl max-w-md w-full">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-semibold text-slate-800" data-i18n="toolManagement">工具管理</h3>
+                    </div>
+                    <button onclick="closeToolModal()" class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="toolList" class="max-h-80 overflow-y-auto p-3 space-y-2">
+                </div>
+                <div class="px-5 py-3 border-t border-slate-200 flex justify-end">
+                    <button onclick="saveToolConfig()" class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primaryHover rounded-lg transition-colors" data-i18n="save">
+                        保存
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -465,7 +505,6 @@
         const sessionDropdown = document.getElementById('sessionDropdown');
         const sessionList = document.getElementById('sessionList');
         const loadMoreBtn = document.getElementById('loadMoreBtn');
-        const currentSessionLabel = document.getElementById('currentSessionLabel');
         
         let isLoading = false;
         let currentPermissionRequestId = null;
@@ -476,7 +515,78 @@
         let sessionPage = 0;
         const pageSize = 5;
         let allSessions = [];
-        let hideSessionTimer = null;
+        let toolConfigs = [];
+
+        function toggleToolModal() {
+            const modal = document.getElementById('toolModal');
+            if (modal.classList.contains('hidden')) {
+                loadToolConfigs();
+            }
+            modal.classList.toggle('hidden');
+        }
+
+        function closeToolModal() {
+            document.getElementById('toolModal').classList.add('hidden');
+        }
+
+        async function loadToolConfigs() {
+            try {
+                const response = await fetch('/tool-config/list');
+                const data = await response.json();
+                toolConfigs = data.configs || [];
+                renderToolList();
+            } catch (error) {
+                console.error('加载工具配置失败:', error);
+            }
+        }
+
+        function renderToolList() {
+            const toolList = document.getElementById('toolList');
+            toolList.innerHTML = '';
+            
+            if (toolConfigs.length === 0) {
+                toolList.innerHTML = '<div class="text-center text-slate-400 py-4">暂无工具</div>';
+                return;
+            }
+            
+            toolConfigs.forEach(tool => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-3 bg-slate-50 rounded-lg';
+                item.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-slate-700">${escapeHtml(tool.toolName)}</div>
+                        <div class="text-xs text-slate-500 truncate">${escapeHtml(tool.description || '')}</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer ml-3">
+                        <input type="checkbox" class="sr-only peer" data-tool="${tool.toolName}" ${tool.enabled ? 'checked' : ''}>
+                        <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                `;
+                toolList.appendChild(item);
+            });
+        }
+
+        async function saveToolConfig() {
+            const checkboxes = document.querySelectorAll('#toolList input[type="checkbox"]');
+            const config = {};
+            checkboxes.forEach(cb => {
+                config[cb.dataset.tool] = cb.checked;
+            });
+            
+            try {
+                const response = await fetch('/tool-config/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                const data = await response.json();
+                if (data.success) {
+                    closeToolModal();
+                }
+            } catch (error) {
+                console.error('保存工具配置失败:', error);
+            }
+        }
 
         function updateWsStatus(status) {
             currentWsStatus = status;
@@ -517,6 +627,11 @@
             const langContainer = document.getElementById('langDropdownContainer');
             if (langContainer && !langContainer.contains(e.target)) {
                 document.getElementById('langDropdown').classList.add('hidden');
+            }
+            
+            const sessionFab = document.getElementById('sessionFab');
+            if (sessionFab && !sessionFab.contains(e.target) && !sessionDropdown.contains(e.target)) {
+                sessionDropdown.classList.add('hidden');
             }
         });
 
@@ -945,25 +1060,13 @@
         }
 
         function updateCurrentSessionLabel() {
-            if (currentSessionId && allSessions.length > 0) {
-                const currentSession = allSessions.find(s => s.sessionId === currentSessionId);
-                if (currentSession && currentSession.summary) {
-                    currentSessionLabel.textContent = currentSession.summary.length > 20 
-                        ? currentSession.summary.substring(0, 20) + '...' 
-                        : currentSession.summary;
-                } else {
-                    currentSessionLabel.textContent = i18n.t('newConversation');
-                }
-            } else {
-                currentSessionLabel.textContent = i18n.t('newConversation');
-            }
+        }
+
+        function toggleSessionDropdown() {
+            sessionDropdown.classList.toggle('hidden');
         }
 
         function showSessionDropdown() {
-            if (hideSessionTimer) {
-                clearTimeout(hideSessionTimer);
-                hideSessionTimer = null;
-            }
             sessionDropdown.classList.remove('hidden');
         }
 
@@ -972,16 +1075,10 @@
         }
 
         function hideSessionDropdownTimer() {
-            hideSessionTimer = setTimeout(() => {
-                sessionDropdown.classList.add('hidden');
-            }, 200);
+            hideSessionDropdown();
         }
 
         function cancelHideSessionDropdown() {
-            if (hideSessionTimer) {
-                clearTimeout(hideSessionTimer);
-                hideSessionTimer = null;
-            }
         }
 
         async function handleSessionChange(sessionId) {

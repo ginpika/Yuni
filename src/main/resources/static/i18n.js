@@ -9,6 +9,9 @@ const i18n = {
             wsConnected: '已连接',
             wsConnecting: '连接中...',
             newConversation: '新对话',
+            sessionList: '会话列表',
+            toolManagement: '工具管理',
+            save: '保存',
             loadMore: '加载更多',
             noSessions: '暂无会话',
             database: '数据库',
@@ -51,6 +54,9 @@ const i18n = {
             wsConnected: 'Connected',
             wsConnecting: 'Connecting...',
             newConversation: 'New Chat',
+            sessionList: 'Sessions',
+            toolManagement: 'Tool Management',
+            save: 'Save',
             loadMore: 'Load More',
             noSessions: 'No sessions',
             database: 'Database',
@@ -124,7 +130,7 @@ const i18n = {
     updateAllText() {
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
-            if (el.tagName === 'INPUT' && el.hasAttribute('placeholder')) {
+            if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && el.hasAttribute('placeholder')) {
                 el.placeholder = this.t(key);
             } else {
                 el.textContent = this.t(key);
