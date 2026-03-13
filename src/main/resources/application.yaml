@@ -20,6 +20,7 @@ spring:
 
 yuni:
   base-url: https://coding.dashscope.aliyuncs.com/v1/chat
+  # ok, i forgot this ~ now this key just a sample
   api-key: sk-sp-c3422acc21d24581bbd128027b36283d
   model: glm-5
   context-window: 202752
