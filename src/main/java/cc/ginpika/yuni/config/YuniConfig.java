@@ -13,4 +13,5 @@ public class YuniConfig {
     private String model;
     private Integer contextWindow = 128000;
     private Integer maxTokens = 4096;
+    private String workspace;
 }

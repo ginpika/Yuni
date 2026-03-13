@@ -33,6 +33,8 @@ public class AgentContext {
     ToolRegistry toolRegistry;
     @Resource
     ToolExecutor toolExecutor;
+    @Resource
+    ToolNotificationService toolNotificationService;
 
     ObjectMapper objectMapper = new ObjectMapper();
 
@@ -113,7 +115,15 @@ public class AgentContext {
                 case "tool_calls" -> {
                     JsonNode toolCall = messageNode.get("tool_calls");
                     toolCall.forEach(node -> {
+                        String toolName = node.at("/function/name").asText();
+                        String arguments = node.at("/function/arguments").asText();
+                        
+                        toolNotificationService.notifyToolCall(session.getSessionId(), toolName, arguments);
+                        
                         ToolExecutor.ToolResult result = toolExecutor.executeFromJson(node);
+                        
+                        toolNotificationService.notifyToolResult(session.getSessionId(), toolName, result.toJson());
+                        
                         YuniMessage toolResultMsg = YuniMessage.builder()
                                 .role("tool")
                                 .content(result.toJson())

@@ -25,3 +25,4 @@ yuni:
   model: glm-5
   context-window: 202752
   max-tokens: 16384
+  workspace: ~/YuniHome
