@@ -122,11 +122,16 @@ public class AgentContext {
                         
                         ToolExecutor.ToolResult result = toolExecutor.executeFromJson(node);
                         
-                        toolNotificationService.notifyToolResult(session.getSessionId(), toolName, result.toJson());
+                        String toolContent = result.toJson();
+                        if ("browser_control".equals(toolName) && toolContent.length() > 2000) {
+                            toolContent = "{\"success\": " + result.isSuccess() + ", \"truncated\": true, \"message\": \"结果已截断，内容过长\"}";
+                        }
+                        
+                        toolNotificationService.notifyToolResult(session.getSessionId(), toolName, toolContent);
                         
                         YuniMessage toolResultMsg = YuniMessage.builder()
                                 .role("tool")
-                                .content(result.toJson())
+                                .content(toolContent)
                                 .rawResponse(rawResponse)
                                 .build();
                         session.getMessages().add(toolResultMsg);
