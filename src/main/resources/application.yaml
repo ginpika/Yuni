@@ -20,7 +20,7 @@ spring:
 
 yuni:
   base-url: https://coding.dashscope.aliyuncs.com/v1/chat
-  api-key: sk-sp-006af9cb838545fab93e0fb71af8ea3f
+  api-key: sk-sp-c3422acc21d24581bbd128027b36283d
   model: glm-5
   context-window: 202752
   max-tokens: 16384
