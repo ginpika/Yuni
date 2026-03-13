@@ -11,6 +11,7 @@ import cc.ginpika.yuni.tool.ToolRegistry;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
@@ -38,12 +39,7 @@ public class AgentContext {
 
     YuniSession systemSession;
 
-    public static final String SYSTEM_PROMPT = "你是一个 AI 助手可以帮助用户完成各种任务。你也可以是任何人，遵从用户的指令\n" +
-            "回复格式要求：\n" +
-            "1. 当你需要调用工具时，输出 JSON 格式: { \"tool_call\": { \"name\": \"工具名称\", \"arguments\": { 参数对象 } } }\n" +
-            "2. 当你认为任务完成可以直接回复时，输出 JSON 格式: { \"reply\": true, \"message\": \"你的回答\" }\n" +
-            "3. 当你需要更多信息时，输出 JSON 格式: { \"reply\": false, \"message\": \"你的问题或说明\" }\n" +
-            "注意：所有回复必须是有效的 JSON 格式。";
+    public static final String SYSTEM_PROMPT = "你是一个 AI 助手可以帮助用户完成各种任务。你也可以是任何人，遵从用户的指令";
 
     @PostConstruct
     public void init() {
@@ -53,7 +49,7 @@ public class AgentContext {
             systemSession = sessionManager.createSession();
             log.info("创建新会话: {}", systemSession.getSessionId());
         } else {
-            SessionEntity latestSession = sessions.get(sessions.size() - 1);
+            SessionEntity latestSession = sessions.getLast();
             systemSession = sessionManager.getSession(latestSession.getSessionId());
             log.info("加载已有会话: {}, 消息数: {}", systemSession.getSessionId(), systemSession.getMessages().size());
         }
@@ -74,62 +70,71 @@ public class AgentContext {
     public ChatResponse reasoningAndActing(YuniSession session) throws IOException {
         String rawResponse = aiClient.call(buildRequestBody(session));
         log.info("AI 原始响应: {}", rawResponse);
+
+        // "/choices/0/message/content"
         
         try {
             JsonNode fullResponse = objectMapper.readTree(rawResponse);
+            JsonNode messageNode = fullResponse.at("/choices/0/message");
+            String finishReason = fullResponse.at("/choices/0/finish_reason").asText();
             String content = fullResponse.at("/choices/0/message/content").asText();
-            
-            JsonNode contentNode;
-            try {
-                contentNode = objectMapper.readTree(content);
-            } catch (Exception e) {
-                YuniMessage assistantMsg = YuniMessage.builder()
-                        .role("assistant")
-                        .content(content)
-                        .rawResponse(rawResponse)
-                        .build();
-                session.getMessages().add(assistantMsg);
-                sessionManager.saveMessage(session.getSessionId(), assistantMsg);
-                
-                return ChatResponse.builder()
-                        .message(content)
-                        .rawResponse(rawResponse)
-                        .success(true)
-                        .build();
+
+            log.info("finishReason: {}", finishReason);
+            log.info("content: {}", content);
+
+            switch (finishReason) {
+                case "tool_calls" -> {
+                    JsonNode toolCall = messageNode.get("tool_calls");
+                    toolCall.forEach(node -> {
+                        ToolExecutor.ToolResult result = toolExecutor.executeFromJson(node);
+                        YuniMessage toolResultMsg = YuniMessage.builder()
+                                .role("tool")
+                                .content(result.toJson())
+                                .rawResponse(rawResponse)
+                                .build();
+                        session.getMessages().add(toolResultMsg);
+                        sessionManager.saveMessage(session.getSessionId(), toolResultMsg);
+                    });
+                    return reasoningAndActing(session);
+                }
+                case "stop" -> {
+                    YuniMessage assistantMsg = YuniMessage.builder()
+                            .role("assistant")
+                            .content(content)
+                            .rawResponse(rawResponse)
+                            .build();
+                    session.getMessages().add(assistantMsg);
+                    sessionManager.saveMessage(session.getSessionId(), assistantMsg);
+                    log.info("因 stop 退出");
+                    return ChatResponse.builder()
+                            .message(content)
+                            .rawResponse(rawResponse)
+                            .success(true)
+                            .build();
+                }
+                case "length" -> {
+                    YuniMessage assistantMsg = YuniMessage.builder()
+                            .role("assistant")
+                            .content(content)
+                            .rawResponse(rawResponse)
+                            .build();
+                    session.getMessages().add(assistantMsg);
+                    sessionManager.saveMessage(session.getSessionId(), assistantMsg);
+                    log.info("因 length 退出");
+                    return ChatResponse.builder()
+                            .message(content)
+                            .rawResponse(rawResponse)
+                            .success(true)
+                            .build();
+                }
             }
-            
-            if (contentNode.has("tool_call")) {
-                JsonNode toolCall = contentNode.get("tool_call");
-                ToolExecutor.ToolResult result = toolExecutor.executeFromJson(toolCall);
-                
-                YuniMessage toolResultMsg = YuniMessage.builder()
-                        .role("tool")
-                        .content(result.toJson())
-                        .rawResponse(rawResponse)
-                        .build();
-                session.getMessages().add(toolResultMsg);
-                sessionManager.saveMessage(session.getSessionId(), toolResultMsg);
-                
-                return reasoningAndActing(session);
-            }
-            
-            String message = contentNode.has("message") ? contentNode.get("message").asText() : content;
-            
-            YuniMessage assistantMsg = YuniMessage.builder()
-                    .role("assistant")
-                    .content(message)
-                    .rawResponse(rawResponse)
-                    .build();
-            session.getMessages().add(assistantMsg);
-            sessionManager.saveMessage(session.getSessionId(), assistantMsg);
-            
             return ChatResponse.builder()
-                    .message(message)
+                    .message("Error")
                     .rawResponse(rawResponse)
-                    .success(true)
+                    .success(false)
                     .build();
-            
         } catch (Exception e) {
+            e.printStackTrace();
             log.warn("解析响应失败: {}", e.getMessage());
             return ChatResponse.builder()
                     .message(rawResponse)
