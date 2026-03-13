@@ -5,6 +5,7 @@ import cc.ginpika.yuni.core.ChatResponse;
 import cc.ginpika.yuni.core.YuniMessage;
 import cc.ginpika.yuni.core.YuniReply;
 import cc.ginpika.yuni.core.YuniSession;
+import cc.ginpika.yuni.entity.SessionEntity;
 import cc.ginpika.yuni.tool.ToolExecutor;
 import cc.ginpika.yuni.tool.ToolRegistry;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -45,7 +47,16 @@ public class AgentContext {
 
     @PostConstruct
     public void init() {
-        systemSession = sessionManager.createSession();
+        List<SessionEntity> sessions = sessionManager.getAllSessions();
+        
+        if (sessions.isEmpty()) {
+            systemSession = sessionManager.createSession();
+            log.info("创建新会话: {}", systemSession.getSessionId());
+        } else {
+            SessionEntity latestSession = sessions.get(sessions.size() - 1);
+            systemSession = sessionManager.getSession(latestSession.getSessionId());
+            log.info("加载已有会话: {}, 消息数: {}", systemSession.getSessionId(), systemSession.getMessages().size());
+        }
     }
 
     public ChatResponse call(String userInput) throws IOException {
@@ -56,11 +67,12 @@ public class AgentContext {
     public ChatResponse call(YuniSession session, String input) throws IOException {
         YuniMessage userMsg = YuniMessage.builder().role("user").content(input).build();
         session.getMessages().add(userMsg);
+        sessionManager.saveMessage(session.getSessionId(), userMsg);
         return reasoningAndActing(session);
     }
 
     public ChatResponse reasoningAndActing(YuniSession session) throws IOException {
-        String rawResponse = aiClient.call(session, buildRequestBody(session));
+        String rawResponse = aiClient.call(buildRequestBody(session));
         log.info("AI 原始响应: {}", rawResponse);
         
         try {
@@ -71,6 +83,14 @@ public class AgentContext {
             try {
                 contentNode = objectMapper.readTree(content);
             } catch (Exception e) {
+                YuniMessage assistantMsg = YuniMessage.builder()
+                        .role("assistant")
+                        .content(content)
+                        .rawResponse(rawResponse)
+                        .build();
+                session.getMessages().add(assistantMsg);
+                sessionManager.saveMessage(session.getSessionId(), assistantMsg);
+                
                 return ChatResponse.builder()
                         .message(content)
                         .rawResponse(rawResponse)
@@ -85,13 +105,23 @@ public class AgentContext {
                 YuniMessage toolResultMsg = YuniMessage.builder()
                         .role("tool")
                         .content(result.toJson())
+                        .rawResponse(rawResponse)
                         .build();
                 session.getMessages().add(toolResultMsg);
+                sessionManager.saveMessage(session.getSessionId(), toolResultMsg);
                 
                 return reasoningAndActing(session);
             }
             
             String message = contentNode.has("message") ? contentNode.get("message").asText() : content;
+            
+            YuniMessage assistantMsg = YuniMessage.builder()
+                    .role("assistant")
+                    .content(message)
+                    .rawResponse(rawResponse)
+                    .build();
+            session.getMessages().add(assistantMsg);
+            sessionManager.saveMessage(session.getSessionId(), assistantMsg);
             
             return ChatResponse.builder()
                     .message(message)
@@ -166,5 +196,17 @@ public class AgentContext {
 
     public void reply(YuniSession session, YuniReply msg) {
         session.reply(msg);
+    }
+    
+    public String getCurrentSessionId() {
+        return systemSession != null ? systemSession.getSessionId() : null;
+    }
+    
+    public List<YuniMessage> getCurrentSessionMessages() {
+        return systemSession != null ? systemSession.getMessages() : List.of();
+    }
+    
+    public int getMessageCount() {
+        return systemSession != null ? systemSession.getMessages().size() : 0;
     }
 }

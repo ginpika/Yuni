@@ -1,8 +1,6 @@
 package cc.ginpika.yuni.service;
 
 import cc.ginpika.yuni.config.YuniConfig;
-import cc.ginpika.yuni.core.YuniMessage;
-import cc.ginpika.yuni.core.YuniSession;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.Resource;
@@ -26,7 +24,7 @@ public class OpenAIClient {
             .readTimeout(300, TimeUnit.SECONDS)
             .build();
 
-    public String call(YuniSession session, String requestBody) throws IOException {
+    public String call(String requestBody) throws IOException {
         Request request = new Request.Builder()
                 .url("https://coding.dashscope.aliyuncs.com/v1/chat/completions")
                 .addHeader("Content-Type", "application/json")
@@ -41,7 +39,6 @@ public class OpenAIClient {
                 ObjectNode objectNode = (ObjectNode) objectMapper.readTree(rawResponse);
                 String contentStr = objectNode.at("/choices/0/message/content").asText();
                 log.info("回答：{}", contentStr);
-                session.getMessages().add(YuniMessage.builder().role("assistant").content(contentStr).build());
                 return rawResponse;
             } else {
                 log.error("请求失败！状态码: {}, 错误信息: {}", response.code(), response.message());
