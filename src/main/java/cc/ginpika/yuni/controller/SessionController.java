@@ -5,6 +5,7 @@ import cc.ginpika.yuni.core.YuniSession;
 import cc.ginpika.yuni.entity.MessageEntity;
 import cc.ginpika.yuni.entity.SessionEntity;
 import cc.ginpika.yuni.repository.MessageRepository;
+import cc.ginpika.yuni.service.AgentContext;
 import cc.ginpika.yuni.service.SessionManager;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.*;
@@ -23,12 +24,26 @@ public class SessionController {
     @Resource
     private MessageRepository messageRepository;
 
+    @Resource
+    private AgentContext agentContext;
+
     @GetMapping("/list")
     public Map<String, Object> listSessions() {
         Map<String, Object> result = new HashMap<>();
         List<SessionEntity> sessions = sessionManager.getAllSessions();
         result.put("sessions", sessions);
         result.put("total", sessions.size());
+        return result;
+    }
+
+    @GetMapping("/recent")
+    public Map<String, Object> getRecentSessions(@RequestParam(defaultValue = "5") int limit) {
+        Map<String, Object> result = new HashMap<>();
+        List<SessionEntity> sessions = sessionManager.getRecentSessions(limit);
+        int total = sessionManager.getAllSessions().size();
+        result.put("sessions", sessions);
+        result.put("total", total);
+        result.put("hasMore", total > sessions.size());
         return result;
     }
 
@@ -67,6 +82,23 @@ public class SessionController {
         result.put("success", true);
         result.put("sessionId", session.getSessionId());
         result.put("message", "会话创建成功");
+        return result;
+    }
+
+    @PostMapping("/switch/{sessionId}")
+    public Map<String, Object> switchSession(@PathVariable String sessionId) {
+        Map<String, Object> result = new HashMap<>();
+        agentContext.switchSession(sessionId);
+        YuniSession session = sessionManager.getSession(sessionId);
+        if (session != null) {
+            result.put("success", true);
+            result.put("sessionId", sessionId);
+            result.put("messages", session.getMessages());
+            result.put("message", "会话切换成功");
+        } else {
+            result.put("success", false);
+            result.put("message", "会话不存在");
+        }
         return result;
     }
 

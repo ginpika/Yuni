@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yuni AI Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/javascript.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/java.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/bash.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/sql.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -16,6 +27,18 @@
                 }
             }
         }
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(code, { language: lang }).value;
+                    } catch (e) {}
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true,
+            gfm: true
+        });
     </script>
     <style>
         .chat-container {
@@ -110,6 +133,110 @@
         .context-bar {
             transition: width 0.3s ease;
         }
+        .ws-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .ws-connected { background-color: #22c55e; }
+        .ws-disconnected { background-color: #ef4444; }
+        .ws-connecting { background-color: #f59e0b; animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .markdown-content {
+            line-height: 1.6;
+        }
+        .markdown-content p {
+            margin: 0 0 0.75em 0;
+        }
+        .markdown-content p:last-child {
+            margin-bottom: 0;
+        }
+        .markdown-content h1, .markdown-content h2, .markdown-content h3,
+        .markdown-content h4, .markdown-content h5, .markdown-content h6 {
+            margin: 0.75em 0 0.5em 0;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+        .markdown-content h1 { font-size: 1.4em; }
+        .markdown-content h2 { font-size: 1.25em; }
+        .markdown-content h3 { font-size: 1.1em; }
+        .markdown-content ul, .markdown-content ol {
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }
+        .markdown-content li {
+            margin: 0.25em 0;
+        }
+        .markdown-content code {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+        .markdown-content pre {
+            margin: 0.75em 0;
+            padding: 0.75em 1em;
+            border-radius: 8px;
+            overflow-x: auto;
+            background: #1e293b;
+        }
+        .markdown-content pre code {
+            background: transparent;
+            padding: 0;
+            font-size: 0.85em;
+            color: #e2e8f0;
+        }
+        .markdown-content blockquote {
+            margin: 0.75em 0;
+            padding: 0.5em 1em;
+            border-left: 3px solid #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 0 4px 4px 0;
+        }
+        .markdown-content blockquote p {
+            margin: 0;
+        }
+        .markdown-content table {
+            margin: 0.75em 0;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .markdown-content th, .markdown-content td {
+            border: 1px solid #e2e8f0;
+            padding: 0.5em 0.75em;
+            text-align: left;
+        }
+        .markdown-content th {
+            background: #f8fafc;
+            font-weight: 600;
+        }
+        .markdown-content a {
+            color: #3b82f6;
+            text-decoration: underline;
+        }
+        .markdown-content a:hover {
+            color: #2563eb;
+        }
+        .markdown-content hr {
+            margin: 1em 0;
+            border: none;
+            border-top: 1px solid #e2e8f0;
+        }
+        .markdown-content img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+        .markdown-content .task-list-item {
+            list-style: none;
+            margin-left: -1.5em;
+        }
+        .markdown-content .task-list-item input {
+            margin-right: 0.5em;
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen">
@@ -124,8 +251,42 @@
                 <div>
                     <h1 class="text-lg font-semibold text-slate-800">Yuni</h1>
                 </div>
+                <div class="flex items-center gap-1.5 ml-2">
+                    <div id="wsStatus" class="ws-status ws-disconnected" title="WebSocket 状态"></div>
+                    <span id="wsStatusText" class="text-xs text-slate-400">未连接</span>
+                </div>
             </div>
-            <div class="flex items-center gap-2">
+            
+            <div class="relative" id="sessionDropdownContainer">
+                <button onclick="toggleSessionDropdown()" class="flex items-center gap-1.5 px-2.5 py-1 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors min-w-[120px]">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                    <span id="currentSessionLabel" class="truncate flex-1 text-left">新对话</span>
+                    <svg class="w-3 h-3 text-slate-400 flex-shrink-0 transition-transform duration-200" id="dropdownArrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div id="sessionDropdown" class="hidden absolute top-full left-0 mt-1 w-64 bg-white rounded-md shadow-sm border border-slate-200 z-50">
+                    <div id="sessionList" class="max-h-72 overflow-y-auto py-1"></div>
+                    <div id="loadMoreBtn" class="hidden border-t border-slate-100">
+                        <button onclick="loadMoreSessions()" class="w-full px-3 py-2 text-xs text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors text-center">
+                            加载更多
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-1.5">
+                <a href="/database.html" class="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1.5" title="数据库管理">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 1.1.9 2.63L4 17h16M4 17l4-4M4 7zm0 0l4-4m4 4-4 4M4 7z"/>
+                        <circle cx="8" cy="11" r="1.5"/>
+                        <circle cx="12" cy="11" r="1.5"/>
+                        <circle cx="16" cy="11" r="1.5"/>
+                    </svg>
+                    数据库
+                </a>
                 <button onclick="createNewSession()" class="px-3 py-1.5 text-sm text-primary hover:bg-blue-50 rounded-md transition-colors flex items-center gap-1.5">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
@@ -211,6 +372,8 @@
                     <p class="text-xs text-slate-500 mb-1">命令：</p>
                     <code id="permissionCommand" class="text-sm text-slate-800 font-mono break-all"></code>
                 </div>
+                
+                <div id="permissionReason" class="text-sm text-slate-600 mb-4"></div>
 
                 <div class="flex items-center gap-2 mb-4">
                     <input type="checkbox" id="rememberChoice" class="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary">
@@ -275,17 +438,136 @@
         const sendBtn = document.getElementById('sendBtn');
         const permissionModal = document.getElementById('permissionModal');
         const permissionCommand = document.getElementById('permissionCommand');
+        const permissionReason = document.getElementById('permissionReason');
         const rememberChoice = document.getElementById('rememberChoice');
         const jsonModal = document.getElementById('jsonModal');
         const jsonContent = document.getElementById('jsonContent');
         const usageBar = document.getElementById('usageBar');
         const usageText = document.getElementById('usageText');
+        const wsStatus = document.getElementById('wsStatus');
+        const wsStatusText = document.getElementById('wsStatusText');
+        const sessionDropdown = document.getElementById('sessionDropdown');
+        const sessionList = document.getElementById('sessionList');
+        const loadMoreBtn = document.getElementById('loadMoreBtn');
+        const currentSessionLabel = document.getElementById('currentSessionLabel');
         
         let isLoading = false;
         let currentPermissionRequestId = null;
-        let pendingPermissionResolve = null;
         let currentJsonData = null;
         let currentSessionId = null;
+        let stompClient = null;
+        let hasMoreSessions = false;
+        let sessionPage = 0;
+        const pageSize = 5;
+        let allSessions = [];
+
+        function updateWsStatus(status) {
+            wsStatus.className = 'ws-status ws-' + status;
+            const statusTexts = {
+                'connected': '已连接',
+                'disconnected': '未连接',
+                'connecting': '连接中...'
+            };
+            wsStatusText.textContent = statusTexts[status] || status;
+        }
+
+        function connectWebSocket() {
+            updateWsStatus('connecting');
+            
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null;
+            
+            stompClient.connect({}, function(frame) {
+                console.log('WebSocket 连接成功:', frame);
+                updateWsStatus('connected');
+                
+                stompClient.subscribe('/topic/permission', function(message) {
+                    console.log('收到权限请求:', message.body);
+                    try {
+                        handlePermissionRequest(JSON.parse(message.body));
+                    } catch (e) {
+                        console.error('解析权限请求失败:', e);
+                    }
+                });
+            }, function(error) {
+                console.error('WebSocket 连接失败:', error);
+                updateWsStatus('disconnected');
+                stompClient = null;
+                
+                setTimeout(connectWebSocket, 3000);
+            });
+        }
+
+        function handlePermissionRequest(data) {
+            if (data.type === 'permission_request') {
+                console.log('处理权限请求:', data.requestId, data.command);
+                currentPermissionRequestId = data.requestId;
+                permissionCommand.textContent = data.command;
+                permissionReason.textContent = data.reason || 'AI 请求执行终端命令';
+                rememberChoice.checked = false;
+                permissionModal.classList.remove('hidden');
+            }
+        }
+
+        function closePermissionModal() {
+            permissionModal.classList.add('hidden');
+        }
+
+        function approvePermission() {
+            if (!currentPermissionRequestId) {
+                console.error('没有权限请求ID');
+                return;
+            }
+            
+            if (!stompClient || !stompClient.connected) {
+                console.error('WebSocket 未连接');
+                alert('WebSocket 连接已断开，请刷新页面重试');
+                return;
+            }
+            
+            const remember = rememberChoice.checked;
+            console.log('发送授权响应:', currentPermissionRequestId, true, remember);
+            
+            try {
+                stompClient.send("/app/permission/response", {}, JSON.stringify({
+                    requestId: currentPermissionRequestId,
+                    approved: true,
+                    remember: remember
+                }));
+            } catch (e) {
+                console.error('发送响应失败:', e);
+            }
+            
+            closePermissionModal();
+        }
+
+        function rejectPermission() {
+            if (!currentPermissionRequestId) {
+                console.error('没有权限请求ID');
+                return;
+            }
+            
+            if (!stompClient || !stompClient.connected) {
+                console.error('WebSocket 未连接');
+                alert('WebSocket 连接已断开，请刷新页面重试');
+                return;
+            }
+            
+            console.log('发送拒绝响应:', currentPermissionRequestId);
+            
+            try {
+                stompClient.send("/app/permission/response", {}, JSON.stringify({
+                    requestId: currentPermissionRequestId,
+                    approved: false,
+                    remember: false
+                }));
+            } catch (e) {
+                console.error('发送响应失败:', e);
+            }
+            
+            closePermissionModal();
+        }
 
         function autoResize(textarea) {
             textarea.style.height = 'auto';
@@ -293,7 +575,7 @@
         }
 
         function handleKeyDown(event) {
-            if (event.key === 'Enter' && !event.shiftKey) {
+            if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
                 event.preventDefault();
                 chatForm.dispatchEvent(new Event('submit'));
             }
@@ -303,94 +585,62 @@
             const spaces = '  '.repeat(indent);
             const nextSpaces = '  '.repeat(indent + 1);
             
-            if (obj === null) {
-                return '<span class="json-null">null</span>';
-            }
-            
-            if (typeof obj === 'boolean') {
-                return `<span class="json-boolean">${obj}</span>`;
-            }
-            
-            if (typeof obj === 'number') {
-                return `<span class="json-number">${obj}</span>`;
-            }
-            
+            if (obj === null) return '<span class="json-null">null</span>';
+            if (typeof obj === 'boolean') return `<span class="json-boolean">${obj}</span>`;
+            if (typeof obj === 'number') return `<span class="json-number">${obj}</span>`;
             if (typeof obj === 'string') {
                 const escaped = obj.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
                 return `<span class="json-string">"${escaped}"</span>`;
             }
-            
             if (Array.isArray(obj)) {
                 if (obj.length === 0) return '[]';
                 const items = obj.map(item => nextSpaces + formatJson(item, indent + 1)).join(',\n');
                 return `[\n${items}\n${spaces}]`;
             }
-            
             if (typeof obj === 'object') {
                 const keys = Object.keys(obj);
                 if (keys.length === 0) return '{}';
-                const items = keys.map(key => {
-                    return `${nextSpaces}<span class="json-key">"${key}"</span>: ${formatJson(obj[key], indent + 1)}`;
-                }).join(',\n');
+                const items = keys.map(key => `${nextSpaces}<span class="json-key">"${key}"</span>: ${formatJson(obj[key], indent + 1)}`).join(',\n');
                 return `{\n${items}\n${spaces}}`;
             }
-            
             return String(obj);
         }
 
-        function addMessage(content, isUser = false, rawResponse = null, isHistory = false) {
+        function addMessage(content, isUser = false, rawResponse = null, isHistory = false, role = null) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `flex items-start gap-2.5 message-enter ${isUser ? 'flex-row-reverse' : ''} ${isHistory ? 'history-message' : ''}`;
             
-            const avatar = isUser 
-                ? `<div class="w-7 h-7 bg-slate-500 rounded-md flex items-center justify-center flex-shrink-0">
-                     <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                     </svg>
-                   </div>`
-                : `<div class="w-7 h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
-                     <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                     </svg>
-                   </div>`;
+            const isTool = role === 'tool';
+            const isAssistant = role === 'assistant';
             
-            const bubbleClass = isUser 
-                ? 'bg-primary text-white rounded-xl' 
-                : 'bg-slate-100 text-slate-700 rounded-xl';
+            let avatar;
+            if (isUser) {
+                avatar = `<div class="w-7 h-7 bg-slate-500 rounded-md flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>`;
+            } else if (isTool) {
+                avatar = `<div class="w-7 h-7 bg-emerald-500 rounded-md flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>`;
+            } else {
+                avatar = `<div class="w-7 h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></div>`;
+            }
             
-            const clickAttr = !isUser && rawResponse 
-                ? `onclick="showJsonModal(this.dataset.raw)" data-raw="${escapeAttr(rawResponse)}" title="点击查看原始响应"` 
-                : '';
+            const bubbleClass = isUser ? 'bg-primary text-white rounded-xl' : (isTool ? 'bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200' : 'bg-slate-100 text-slate-700 rounded-xl');
+            const clickAttr = !isUser && rawResponse ? `onclick="showJsonModal(this.dataset.raw)" data-raw="${escapeAttr(rawResponse)}" title="点击查看原始响应"` : '';
+            const indicator = !isUser && rawResponse ? `<div class="flex items-center gap-1 mt-1.5 pt-1.5 border-t ${isTool ? 'border-emerald-200/50' : 'border-slate-200/50'}"><svg class="w-3 h-3 ${isTool ? 'text-emerald-400' : 'text-slate-400'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg><span class="text-xs ${isTool ? 'text-emerald-400' : 'text-slate-400'}">点击查看详情</span></div>` : '';
             
-            const indicator = !isUser && rawResponse 
-                ? `<div class="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-slate-200/50">
-                     <svg class="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                       <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
-                     </svg>
-                     <span class="text-xs text-slate-400">点击查看详情</span>
-                   </div>`
-                : '';
+            let contentHtml;
+            if (isAssistant && !isTool) {
+                contentHtml = `<div class="text-sm markdown-content">${marked.parse(content)}</div>`;
+            } else {
+                contentHtml = `<p class="text-sm leading-relaxed whitespace-pre-wrap">${escapeHtml(content)}</p>`;
+            }
             
-            messageDiv.innerHTML = `
-                ${avatar}
-                <div class="message-bubble ${bubbleClass} px-3.5 py-2.5 max-w-[80%]" ${clickAttr}>
-                    <p class="text-sm leading-relaxed whitespace-pre-wrap">${escapeHtml(content)}</p>
-                    ${indicator}
-                </div>
-            `;
-            
+            messageDiv.innerHTML = `${avatar}<div class="message-bubble ${bubbleClass} px-3.5 py-2.5 max-w-[80%]" ${clickAttr}>${contentHtml}${indicator}</div>`;
             chatContainer.appendChild(messageDiv);
             scrollToBottom();
         }
 
         function escapeAttr(text) {
             if (!text) return '';
-            return text
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
 
         function showJsonModal(rawResponse) {
@@ -415,31 +665,19 @@
                 navigator.clipboard.writeText(text).then(() => {
                     const btn = event.target.closest('button');
                     const originalText = btn.innerHTML;
-                    btn.innerHTML = `
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                        </svg>
-                        已复制
-                    `;
-                    setTimeout(() => {
-                        btn.innerHTML = originalText;
-                    }, 1500);
+                    btn.innerHTML = `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>已复制`;
+                    setTimeout(() => { btn.innerHTML = originalText; }, 1500);
                 });
             }
         }
 
         function parseRawResponse(rawResponse) {
             if (!rawResponse) return null;
-            
             try {
                 let parsed = JSON.parse(rawResponse);
-                
                 if (typeof parsed === 'string') {
-                    try {
-                        parsed = JSON.parse(parsed);
-                    } catch (e) {}
+                    try { parsed = JSON.parse(parsed); } catch (e) {}
                 }
-                
                 return parsed;
             } catch (e) {
                 return rawResponse;
@@ -450,29 +688,14 @@
             const typingDiv = document.createElement('div');
             typingDiv.id = 'typingIndicator';
             typingDiv.className = 'flex items-start gap-2.5 message-enter';
-            typingDiv.innerHTML = `
-                <div class="w-7 h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
-                    <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                    </svg>
-                </div>
-                <div class="bg-slate-100 rounded-xl px-3.5 py-2.5">
-                    <div class="typing-indicator flex gap-1">
-                        <span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span>
-                        <span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span>
-                        <span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span>
-                    </div>
-                </div>
-            `;
+            typingDiv.innerHTML = `<div class="w-7 h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg></div><div class="bg-slate-100 rounded-xl px-3.5 py-2.5"><div class="typing-indicator flex gap-1"><span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span><span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span><span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span></div></div>`;
             chatContainer.appendChild(typingDiv);
             scrollToBottom();
         }
 
         function removeTypingIndicator() {
             const indicator = document.getElementById('typingIndicator');
-            if (indicator) {
-                indicator.remove();
-            }
+            if (indicator) indicator.remove();
         }
 
         function scrollToBottom() {
@@ -491,65 +714,10 @@
             userInput.disabled = loading;
         }
 
-        function showPermissionModal(command, requestId) {
-            return new Promise((resolve) => {
-                currentPermissionRequestId = requestId;
-                pendingPermissionResolve = resolve;
-                permissionCommand.textContent = command;
-                rememberChoice.checked = false;
-                permissionModal.classList.remove('hidden');
-            });
-        }
-
-        function closePermissionModal() {
-            permissionModal.classList.add('hidden');
-            currentPermissionRequestId = null;
-            pendingPermissionResolve = null;
-        }
-
-        async function approvePermission() {
-            const requestId = currentPermissionRequestId;
-            const remember = rememberChoice.checked;
-            closePermissionModal();
-            
-            try {
-                const response = await fetch(`/permission/approve?requestId=${encodeURIComponent(requestId)}&remember=${remember}`, {
-                    method: 'POST'
-                });
-                const result = await response.json();
-                if (pendingPermissionResolve) {
-                    pendingPermissionResolve({ approved: true, requestId });
-                }
-            } catch (error) {
-                console.error('批准权限失败:', error);
-                if (pendingPermissionResolve) {
-                    pendingPermissionResolve({ approved: false, error: error.message });
-                }
-            }
-        }
-
-        async function rejectPermission() {
-            const requestId = currentPermissionRequestId;
-            closePermissionModal();
-            
-            try {
-                await fetch(`/permission/reject?requestId=${encodeURIComponent(requestId)}`, {
-                    method: 'POST'
-                });
-            } catch (error) {
-                console.error('拒绝权限失败:', error);
-            }
-            
-            if (pendingPermissionResolve) {
-                pendingPermissionResolve({ approved: false });
-            }
-        }
-
         async function updateUsage() {
             try {
                 const response = await fetch('/api/usage');
                 const data = await response.json();
-                
                 const percentage = Math.min(data.percentage, 100);
                 usageBar.style.width = percentage + '%';
                 usageText.textContent = `${data.currentTokens.toLocaleString()} / ${data.contextWindow.toLocaleString()} tokens`;
@@ -570,25 +738,143 @@
             try {
                 const response = await fetch('/session/latest');
                 const data = await response.json();
-                
                 currentSessionId = data.sessionId;
-                
                 chatContainer.innerHTML = '';
                 
                 if (data.messages && data.messages.length > 0) {
                     data.messages.forEach(msg => {
                         const isUser = msg.role === 'user';
-                        addMessage(msg.content, isUser, msg.rawResponse, true);
+                        addMessage(msg.content, isUser, msg.rawResponse, true, msg.role);
                     });
                 } else {
-                    addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false);
+                    addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false, 'assistant');
                 }
-                
                 updateUsage();
+                loadSessionList();
             } catch (error) {
                 console.error('加载历史消息失败:', error);
                 chatContainer.innerHTML = '';
-                addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false);
+                addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false, 'assistant');
+            }
+        }
+
+        async function loadSessionList() {
+            try {
+                const response = await fetch('/session/recent?limit=0');
+                const data = await response.json();
+                allSessions = data.sessions || [];
+                hasMoreSessions = allSessions.length > pageSize;
+                sessionPage = 0;
+                renderSessionList();
+                updateCurrentSessionLabel();
+            } catch (error) {
+                console.error('加载会话列表失败:', error);
+            }
+        }
+
+        function renderSessionList() {
+            const start = 0;
+            const end = (sessionPage + 1) * pageSize;
+            const sessionsToShow = allSessions.slice(start, end);
+            
+            sessionList.innerHTML = '';
+            
+            if (sessionsToShow.length === 0) {
+                sessionList.innerHTML = '<div class="px-3 py-3 text-xs text-slate-400 text-center">暂无会话</div>';
+                loadMoreBtn.classList.add('hidden');
+                return;
+            }
+            
+            sessionsToShow.forEach(session => {
+                const item = document.createElement('div');
+                item.className = `px-3 py-2 cursor-pointer transition-colors ${session.sessionId === currentSessionId ? 'bg-slate-100' : 'hover:bg-slate-50'}`;
+                item.onclick = () => handleSessionChange(session.sessionId);
+                
+                const date = new Date(session.updatedAt);
+                const timeStr = date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const summary = session.summary || '新对话';
+                
+                item.innerHTML = `
+                    <div class="text-sm text-slate-700 truncate">${escapeHtml(summary)}</div>
+                    <div class="text-xs text-slate-400 mt-0.5">${timeStr}</div>
+                `;
+                sessionList.appendChild(item);
+            });
+            
+            if (end < allSessions.length) {
+                loadMoreBtn.classList.remove('hidden');
+            } else {
+                loadMoreBtn.classList.add('hidden');
+            }
+        }
+
+        function loadMoreSessions() {
+            sessionPage++;
+            renderSessionList();
+        }
+
+        function updateCurrentSessionLabel() {
+            if (currentSessionId && allSessions.length > 0) {
+                const currentSession = allSessions.find(s => s.sessionId === currentSessionId);
+                if (currentSession && currentSession.summary) {
+                    currentSessionLabel.textContent = currentSession.summary.length > 20 
+                        ? currentSession.summary.substring(0, 20) + '...' 
+                        : currentSession.summary;
+                } else {
+                    currentSessionLabel.textContent = '新对话';
+                }
+            } else {
+                currentSessionLabel.textContent = '新对话';
+            }
+        }
+
+        function toggleSessionDropdown() {
+            const isHidden = sessionDropdown.classList.contains('hidden');
+            sessionDropdown.classList.toggle('hidden');
+            const arrow = document.getElementById('dropdownArrow');
+            arrow.style.transform = isHidden ? 'rotate(180deg)' : '';
+        }
+
+        document.addEventListener('click', function(e) {
+            const container = document.getElementById('sessionDropdownContainer');
+            if (!container.contains(e.target)) {
+                sessionDropdown.classList.add('hidden');
+                document.getElementById('dropdownArrow').style.transform = '';
+            }
+        });
+
+        async function handleSessionChange(sessionId) {
+            sessionDropdown.classList.add('hidden');
+            
+            if (!sessionId || sessionId === currentSessionId) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/session/switch/' + sessionId, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentSessionId = sessionId;
+                    chatContainer.innerHTML = '';
+                    
+                    if (data.messages && data.messages.length > 0) {
+                        data.messages.forEach(msg => {
+                            const isUser = msg.role === 'user';
+                            addMessage(msg.content, isUser, msg.rawResponse, true, msg.role);
+                        });
+                    } else {
+                        addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false, 'assistant');
+                    }
+                    updateUsage();
+                    updateCurrentSessionLabel();
+                    renderSessionList();
+                } else {
+                    alert('切换会话失败: ' + data.message);
+                }
+            } catch (error) {
+                console.error('切换会话失败:', error);
+                alert('切换会话失败');
             }
         }
 
@@ -596,12 +882,12 @@
             try {
                 const response = await fetch('/session/create', { method: 'POST' });
                 const data = await response.json();
-                
                 if (data.success) {
                     currentSessionId = data.sessionId;
                     chatContainer.innerHTML = '';
-                    addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false);
+                    addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false, 'assistant');
                     updateUsage();
+                    loadSessionList();
                 }
             } catch (error) {
                 console.error('创建新会话失败:', error);
@@ -611,53 +897,24 @@
         async function sendMessage(message) {
             if (!message.trim() || isLoading) return;
             
-            addMessage(message, true);
+            addMessage(message, true, null, false, 'user');
             setLoading(true);
             addTypingIndicator();
             
             try {
                 const response = await fetch('/chat?input=' + encodeURIComponent(message));
-                
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
+                if (!response.ok) throw new Error('Network response was not ok');
                 
                 const data = await response.json();
-                
                 let replyMessage = data.message || '无响应';
                 let rawResponse = data.rawResponse;
                 
-                if (rawResponse) {
-                    const fullJson = parseRawResponse(rawResponse);
-                    if (fullJson?.choices?.[0]?.message?.content) {
-                        const content = fullJson.choices[0].message.content;
-                        const contentJson = parseRawResponse(content);
-                        if (contentJson?.need_permission) {
-                            removeTypingIndicator();
-                            addMessage(`需要权限执行命令: ${contentJson.command}`, false, null);
-                            
-                            const result = await showPermissionModal(contentJson.command, contentJson.request_id);
-                            
-                            if (result.approved) {
-                                addTypingIndicator();
-                                await sendMessage(message);
-                                return;
-                            } else {
-                                addMessage('权限被拒绝，命令未执行。', false, null);
-                                setLoading(false);
-                                userInput.focus();
-                                return;
-                            }
-                        }
-                    }
-                }
-                
                 removeTypingIndicator();
-                addMessage(replyMessage, false, rawResponse);
+                addMessage(replyMessage, false, rawResponse, false, 'assistant');
                 updateUsage();
             } catch (error) {
                 removeTypingIndicator();
-                addMessage('抱歉，发生了错误：' + error.message, false, null);
+                addMessage('抱歉，发生了错误：' + error.message, false, null, false, 'assistant');
             } finally {
                 setLoading(false);
                 userInput.focus();
@@ -666,7 +923,7 @@
 
         function clearChat() {
             chatContainer.innerHTML = '';
-            addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false);
+            addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false, 'assistant');
         }
 
         chatForm.addEventListener('submit', (e) => {
@@ -679,6 +936,7 @@
             }
         });
 
+        connectWebSocket();
         loadHistory();
         userInput.focus();
     </script>

@@ -11,7 +11,6 @@ import cc.ginpika.yuni.tool.ToolRegistry;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeType;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
@@ -60,6 +59,19 @@ public class AgentContext {
         return call(systemSession, userInput);
     }
 
+    public ChatResponse call(String sessionId, String input) throws IOException {
+        YuniSession session;
+        if (sessionId == null || sessionId.isEmpty() || sessionId.equals(systemSession.getSessionId())) {
+            session = systemSession;
+        } else {
+            session = sessionManager.getSession(sessionId);
+            if (session == null) {
+                session = systemSession;
+            }
+        }
+        return call(session, input);
+    }
+
     public ChatResponse call(YuniSession session, String input) throws IOException {
         YuniMessage userMsg = YuniMessage.builder().role("user").content(input).build();
         session.getMessages().add(userMsg);
@@ -67,11 +79,26 @@ public class AgentContext {
         return reasoningAndActing(session);
     }
 
+    public void switchSession(String sessionId) {
+        if (sessionId == null || sessionId.isEmpty()) {
+            return;
+        }
+        YuniSession session = sessionManager.getSession(sessionId);
+        if (session != null) {
+            systemSession = session;
+            log.info("切换到会话: {}", sessionId);
+        }
+    }
+
+    public String createNewSession() {
+        systemSession = sessionManager.createSession();
+        log.info("创建新会话: {}", systemSession.getSessionId());
+        return systemSession.getSessionId();
+    }
+
     public ChatResponse reasoningAndActing(YuniSession session) throws IOException {
         String rawResponse = aiClient.call(buildRequestBody(session));
         log.info("AI 原始响应: {}", rawResponse);
-
-        // "/choices/0/message/content"
         
         try {
             JsonNode fullResponse = objectMapper.readTree(rawResponse);
