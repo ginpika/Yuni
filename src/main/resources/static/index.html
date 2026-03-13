@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yuni AI Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        primaryHover: '#2563eb',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .chat-container {
+            height: calc(100vh - 160px);
+        }
+        .message-enter {
+            animation: slideIn 0.2s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .typing-indicator span {
+            animation: bounce 1.2s infinite ease-in-out;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: 0s; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.15s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-3px); }
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 5px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e1;
+        }
+        .modal-overlay {
+            animation: fadeIn 0.15s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .modal-content {
+            animation: slideUp 0.2s ease-out;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .message-bubble {
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .message-bubble:hover {
+            filter: brightness(0.97);
+        }
+        .json-viewer {
+            max-height: 60vh;
+            overflow: auto;
+        }
+        .json-viewer::-webkit-scrollbar {
+            width: 6px;
+        }
+        .json-viewer::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+        .json-viewer::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .json-key { color: #0ea5e9; }
+        .json-string { color: #22c55e; }
+        .json-number { color: #f59e0b; }
+        .json-boolean { color: #a855f7; }
+        .json-null { color: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <div class="max-w-3xl mx-auto p-4 h-screen flex flex-col">
+        <header class="flex items-center justify-between py-3 mb-3">
+            <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-semibold text-slate-800">Yuni</h1>
+                </div>
+            </div>
+            <button onclick="clearChat()" class="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1.5">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                清空
+            </button>
+        </header>
+
+        <div id="chatContainer" class="chat-container overflow-y-auto scrollbar-thin bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+            <div class="flex items-start gap-2.5 message-enter">
+                <div class="w-7 h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    </svg>
+                </div>
+                <div class="bg-slate-100 rounded-xl px-3.5 py-2.5 max-w-[80%]">
+                    <p class="text-slate-700 text-sm leading-relaxed">你好！我是 Yuni AI 助手，有什么可以帮助你的吗？</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3 bg-white rounded-xl border border-slate-200 p-2.5">
+            <form id="chatForm" class="flex gap-2.5">
+                <div class="flex-1 relative">
+                    <textarea 
+                        id="userInput" 
+                        rows="1"
+                        placeholder="输入你的问题..."
+                        class="w-full resize-none border-0 focus:ring-0 focus:outline-none text-slate-700 text-sm placeholder-slate-400 py-1.5 px-1 max-h-28"
+                        onkeydown="handleKeyDown(event)"
+                        oninput="autoResize(this)"
+                    ></textarea>
+                </div>
+                <button 
+                    type="submit" 
+                    id="sendBtn"
+                    class="px-4 py-2 bg-primary hover:bg-primaryHover text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                    发送
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="permissionModal" class="hidden fixed inset-0 z-50">
+        <div class="modal-overlay absolute inset-0 bg-black/30" onclick="closePermissionModal()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="modal-content bg-white rounded-xl shadow-xl max-w-md w-full p-5">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-800">权限请求</h3>
+                        <p class="text-xs text-slate-500">AI 请求执行终端命令</p>
+                    </div>
+                </div>
+                
+                <div class="bg-slate-50 rounded-lg p-3 mb-4">
+                    <p class="text-xs text-slate-500 mb-1">命令：</p>
+                    <code id="permissionCommand" class="text-sm text-slate-800 font-mono break-all"></code>
+                </div>
+
+                <div class="flex items-center gap-2 mb-4">
+                    <input type="checkbox" id="rememberChoice" class="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary">
+                    <label for="rememberChoice" class="text-sm text-slate-600">记住此命令（加入白名单）</label>
+                </div>
+
+                <div class="flex gap-2">
+                    <button onclick="rejectPermission()" class="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                        拒绝
+                    </button>
+                    <button onclick="approvePermission()" class="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primaryHover rounded-lg transition-colors">
+                        允许
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="jsonModal" class="hidden fixed inset-0 z-50">
+        <div class="modal-overlay absolute inset-0 bg-black/30" onclick="closeJsonModal()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="modal-content bg-white rounded-xl shadow-xl max-w-2xl w-full">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+                            <svg class="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-base font-semibold text-slate-800">API 响应详情</h3>
+                    </div>
+                    <button onclick="closeJsonModal()" class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition-colors">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-5">
+                    <div class="json-viewer bg-slate-900 rounded-lg p-4">
+                        <pre id="jsonContent" class="text-sm font-mono text-slate-100 whitespace-pre-wrap break-all"></pre>
+                    </div>
+                </div>
+                <div class="px-5 py-3 border-t border-slate-200 flex justify-end gap-2">
+                    <button onclick="copyJson()" class="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        复制
+                    </button>
+                    <button onclick="closeJsonModal()" class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primaryHover rounded-lg transition-colors">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const chatForm = document.getElementById('chatForm');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const permissionModal = document.getElementById('permissionModal');
+        const permissionCommand = document.getElementById('permissionCommand');
+        const rememberChoice = document.getElementById('rememberChoice');
+        const jsonModal = document.getElementById('jsonModal');
+        const jsonContent = document.getElementById('jsonContent');
+        
+        let isLoading = false;
+        let currentPermissionRequestId = null;
+        let pendingPermissionResolve = null;
+        let currentJsonData = null;
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 112) + 'px';
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                chatForm.dispatchEvent(new Event('submit'));
+            }
+        }
+
+        function formatJson(obj, indent = 0) {
+            const spaces = '  '.repeat(indent);
+            const nextSpaces = '  '.repeat(indent + 1);
+            
+            if (obj === null) {
+                return '<span class="json-null">null</span>';
+            }
+            
+            if (typeof obj === 'boolean') {
+                return `<span class="json-boolean">${obj}</span>`;
+            }
+            
+            if (typeof obj === 'number') {
+                return `<span class="json-number">${obj}</span>`;
+            }
+            
+            if (typeof obj === 'string') {
+                const escaped = obj.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+                return `<span class="json-string">"${escaped}"</span>`;
+            }
+            
+            if (Array.isArray(obj)) {
+                if (obj.length === 0) return '[]';
+                const items = obj.map(item => nextSpaces + formatJson(item, indent + 1)).join(',\n');
+                return `[\n${items}\n${spaces}]`;
+            }
+            
+            if (typeof obj === 'object') {
+                const keys = Object.keys(obj);
+                if (keys.length === 0) return '{}';
+                const items = keys.map(key => {
+                    return `${nextSpaces}<span class="json-key">"${key}"</span>: ${formatJson(obj[key], indent + 1)}`;
+                }).join(',\n');
+                return `{\n${items}\n${spaces}}`;
+            }
+            
+            return String(obj);
+        }
+
+        function addMessage(content, isUser = false, rawJson = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex items-start gap-2.5 message-enter ${isUser ? 'flex-row-reverse' : ''}`;
+            
+            const avatar = isUser 
+                ? `<div class="w-7 h-7 bg-slate-500 rounded-md flex items-center justify-center flex-shrink-0">
+                     <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                     </svg>
+                   </div>`
+                : `<div class="w-7 h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
+                     <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                     </svg>
+                   </div>`;
+            
+            const bubbleClass = isUser 
+                ? 'bg-primary text-white rounded-xl' 
+                : 'bg-slate-100 text-slate-700 rounded-xl';
+            
+            const clickAttr = !isUser && rawJson 
+                ? `onclick="showJsonModal(${escapeAttr(JSON.stringify(rawJson))})" title="点击查看原始响应"` 
+                : '';
+            
+            const indicator = !isUser && rawJson 
+                ? `<div class="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-slate-200/50">
+                     <svg class="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                       <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                     </svg>
+                     <span class="text-xs text-slate-400">点击查看详情</span>
+                   </div>`
+                : '';
+            
+            messageDiv.innerHTML = `
+                ${avatar}
+                <div class="message-bubble ${bubbleClass} px-3.5 py-2.5 max-w-[80%]" ${clickAttr}>
+                    <p class="text-sm leading-relaxed whitespace-pre-wrap">${escapeHtml(content)}</p>
+                    ${indicator}
+                </div>
+            `;
+            
+            chatContainer.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function escapeAttr(text) {
+            return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        function showJsonModal(jsonStr) {
+            try {
+                const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+                currentJsonData = data;
+                jsonContent.innerHTML = formatJson(data);
+            } catch (e) {
+                jsonContent.textContent = jsonStr;
+            }
+            jsonModal.classList.remove('hidden');
+        }
+
+        function closeJsonModal() {
+            jsonModal.classList.add('hidden');
+            currentJsonData = null;
+        }
+
+        function copyJson() {
+            if (currentJsonData) {
+                const text = JSON.stringify(currentJsonData, null, 2);
+                navigator.clipboard.writeText(text).then(() => {
+                    const btn = event.target.closest('button');
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = `
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        已复制
+                    `;
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                    }, 1500);
+                });
+            }
+        }
+
+        function addTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typingIndicator';
+            typingDiv.className = 'flex items-start gap-2.5 message-enter';
+            typingDiv.innerHTML = `
+                <div class="w-7 h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                    </svg>
+                </div>
+                <div class="bg-slate-100 rounded-xl px-3.5 py-2.5">
+                    <div class="typing-indicator flex gap-1">
+                        <span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span>
+                        <span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span>
+                        <span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span>
+                    </div>
+                </div>
+            `;
+            chatContainer.appendChild(typingDiv);
+            scrollToBottom();
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function setLoading(loading) {
+            isLoading = loading;
+            sendBtn.disabled = loading;
+            userInput.disabled = loading;
+        }
+
+        function showPermissionModal(command, requestId) {
+            return new Promise((resolve) => {
+                currentPermissionRequestId = requestId;
+                pendingPermissionResolve = resolve;
+                permissionCommand.textContent = command;
+                rememberChoice.checked = false;
+                permissionModal.classList.remove('hidden');
+            });
+        }
+
+        function closePermissionModal() {
+            permissionModal.classList.add('hidden');
+            currentPermissionRequestId = null;
+            pendingPermissionResolve = null;
+        }
+
+        async function approvePermission() {
+            const requestId = currentPermissionRequestId;
+            const remember = rememberChoice.checked;
+            closePermissionModal();
+            
+            try {
+                const response = await fetch(`/permission/approve?requestId=${encodeURIComponent(requestId)}&remember=${remember}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                if (pendingPermissionResolve) {
+                    pendingPermissionResolve({ approved: true, requestId });
+                }
+            } catch (error) {
+                console.error('批准权限失败:', error);
+                if (pendingPermissionResolve) {
+                    pendingPermissionResolve({ approved: false, error: error.message });
+                }
+            }
+        }
+
+        async function rejectPermission() {
+            const requestId = currentPermissionRequestId;
+            closePermissionModal();
+            
+            try {
+                await fetch(`/permission/reject?requestId=${encodeURIComponent(requestId)}`, {
+                    method: 'POST'
+                });
+            } catch (error) {
+                console.error('拒绝权限失败:', error);
+            }
+            
+            if (pendingPermissionResolve) {
+                pendingPermissionResolve({ approved: false });
+            }
+        }
+
+        async function sendMessage(message) {
+            if (!message.trim() || isLoading) return;
+            
+            addMessage(message, true);
+            setLoading(true);
+            addTypingIndicator();
+            
+            try {
+                const response = await fetch('/chat?input=' + encodeURIComponent(message));
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                
+                const data = await response.text();
+                
+                let replyMessage = data;
+                let jsonData = null;
+                
+                try {
+                    const jsonMatch = data.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        jsonData = JSON.parse(jsonMatch[0]);
+                        
+                        if (jsonData.need_permission) {
+                            removeTypingIndicator();
+                            addMessage(`需要权限执行命令: ${jsonData.command}`, false, jsonData);
+                            
+                            const result = await showPermissionModal(jsonData.command, jsonData.request_id);
+                            
+                            if (result.approved) {
+                                addTypingIndicator();
+                                await sendMessage(message);
+                                return;
+                            } else {
+                                addMessage('权限被拒绝，命令未执行。', false);
+                                setLoading(false);
+                                userInput.focus();
+                                return;
+                            }
+                        }
+                        
+                        if (jsonData.message) {
+                            replyMessage = jsonData.message;
+                        }
+                    }
+                } catch (e) {
+                }
+                
+                removeTypingIndicator();
+                addMessage(replyMessage, false, jsonData || { raw: data });
+            } catch (error) {
+                removeTypingIndicator();
+                addMessage('抱歉，发生了错误：' + error.message, false, { error: error.message });
+            } finally {
+                setLoading(false);
+                userInput.focus();
+            }
+        }
+
+        function clearChat() {
+            chatContainer.innerHTML = `
+                <div class="flex items-start gap-2.5 message-enter">
+                    <div class="w-7 h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                        </svg>
+                    </div>
+                    <div class="bg-slate-100 rounded-xl px-3.5 py-2.5 max-w-[80%]">
+                        <p class="text-slate-700 text-sm leading-relaxed">你好！我是 Yuni AI 助手，有什么可以帮助你的吗？</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = userInput.value.trim();
+            if (message) {
+                sendMessage(message);
+                userInput.value = '';
+                userInput.style.height = 'auto';
+            }
+        });
+
+        userInput.focus();
+    </script>
+</body>
+</html>
