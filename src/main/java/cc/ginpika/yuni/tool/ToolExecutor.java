@@ -1,5 +1,6 @@
 package cc.ginpika.yuni.tool;
 
+import cc.ginpika.yuni.service.ToolConfigService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -13,6 +14,9 @@ public class ToolExecutor {
     @Resource
     private ToolRegistry toolRegistry;
     
+    @Resource
+    private ToolConfigService toolConfigService;
+    
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ToolResult execute(String toolName, JsonNode arguments) {
@@ -20,6 +24,11 @@ public class ToolExecutor {
         if (tool == null) {
             log.error("工具不存在: {}", toolName);
             return ToolResult.error("工具不存在: " + toolName);
+        }
+        
+        if (!toolConfigService.isToolEnabled(toolName)) {
+            log.warn("工具已禁用: {}", toolName);
+            return ToolResult.error("工具已禁用: " + toolName);
         }
         
         try {
