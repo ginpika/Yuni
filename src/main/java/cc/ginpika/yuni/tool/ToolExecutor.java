@@ -35,8 +35,8 @@ public class ToolExecutor {
 
     public ToolResult executeFromJson(JsonNode toolCall) {
         try {
-            String toolName = toolCall.has("name") ? toolCall.get("name").asText() : null;
-            JsonNode arguments = toolCall.has("arguments") ? toolCall.get("arguments") : objectMapper.createObjectNode();
+            String toolName = toolCall.at("/function/name").asText();
+            JsonNode arguments = toolCall.at("/function/arguments");
             
             if (toolName == null || toolName.isEmpty()) {
                 return ToolResult.error("工具调用缺少 name 字段");
