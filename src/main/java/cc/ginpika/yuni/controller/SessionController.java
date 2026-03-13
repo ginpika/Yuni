@@ -110,4 +110,13 @@ public class SessionController {
         result.put("message", "会话删除成功");
         return result;
     }
+
+    @DeleteMapping("/{sessionId}/messages")
+    public Map<String, Object> clearSessionMessages(@PathVariable String sessionId) {
+        Map<String, Object> result = new HashMap<>();
+        sessionManager.clearSessionMessages(sessionId);
+        result.put("success", true);
+        result.put("message", "会话消息已清空");
+        return result;
+    }
 }

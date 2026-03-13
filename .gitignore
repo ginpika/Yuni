@@ -7,6 +7,9 @@ data/
 application-local.yaml
 .DS_Store
 
+# Not release now
+**/YuniAffectiveCore.java
+
 ### STS ###
 .apt_generated
 .classpath

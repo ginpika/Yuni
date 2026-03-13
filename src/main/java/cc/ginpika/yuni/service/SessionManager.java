@@ -107,6 +107,16 @@ public class SessionManager {
         log.info("删除会话: {}", sessionId);
     }
 
+    @Transactional
+    public void clearSessionMessages(String sessionId) {
+        messageRepository.deleteBySessionId(sessionId);
+        sessionRepository.findBySessionId(sessionId).ifPresent(session -> {
+            session.setUpdatedAt(LocalDateTime.now());
+            sessionRepository.save(session);
+        });
+        log.info("清空会话消息: {}", sessionId);
+    }
+
     @Transactional(readOnly = true)
     public List<SessionEntity> getAllSessions() {
         return sessionRepository.findAll();
