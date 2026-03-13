@@ -23,4 +23,7 @@ public class SessionEntity {
     private String sessionId;
     
     private String status;
+    
+    @Column(length = 500)
+    private String summary;
 }

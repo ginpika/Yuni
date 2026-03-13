@@ -81,10 +81,23 @@ public class SessionManager {
         
         sessionRepository.findBySessionId(sessionId).ifPresent(session -> {
             session.setUpdatedAt(LocalDateTime.now());
+            if ("user".equals(message.getRole()) && (session.getSummary() == null || session.getSummary().isEmpty())) {
+                String summary = generateSummary(message.getContent());
+                session.setSummary(summary);
+            }
             sessionRepository.save(session);
         });
         
         log.debug("保存消息: sessionId={}, role={}", sessionId, message.getRole());
+    }
+
+    private String generateSummary(String content) {
+        if (content == null || content.isEmpty()) {
+            return "新对话";
+        }
+        String summary = content.length() > 50 ? content.substring(0, 50) + "..." : content;
+        summary = summary.replace("\n", " ").trim();
+        return summary;
     }
 
     @Transactional
@@ -97,5 +110,13 @@ public class SessionManager {
     @Transactional(readOnly = true)
     public List<SessionEntity> getAllSessions() {
         return sessionRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionEntity> getRecentSessions(int limit) {
+        if (limit <= 0) {
+            return sessionRepository.findAllByOrderByUpdatedAtDesc();
+        }
+        return sessionRepository.findTop5ByOrderByUpdatedAtDesc();
     }
 }

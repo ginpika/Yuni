@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据库管理 - Yuni</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        primaryHover: '#2563eb',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e1;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <div class="max-w-6xl mx-auto p-6">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+                <a href="/" class="w-9 h-9 bg-primary rounded-lg flex items-center justify-center hover:bg-primaryHover transition-colors">
+                    <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                </a>
+                <div>
+                    <h1 class="text-xl font-semibold text-slate-800">数据库管理</h1>
+                    <p class="text-sm text-slate-500">H2 Database Console</p>
+                </div>
+            </div>
+            <a href="/h2-console" target="_blank" class="px-4 py-2 text-sm text-primary hover:bg-blue-50 rounded-lg transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                </svg>
+                H2 Console
+            </a>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div id="sessionsCard" class="bg-white rounded-xl border border-slate-200 p-5 cursor-pointer hover:border-primary transition-colors">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-500">会话表</p>
+                        <p class="text-2xl font-semibold text-slate-800"><span id="sessionsCount">0</span> 条</p>
+                    </div>
+                </div>
+            </div>
+            <div id="messagesCard" class="bg-white rounded-xl border border-slate-200 p-5 cursor-pointer hover:border-primary transition-colors">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-500">消息表</p>
+                        <p class="text-2xl font-semibold text-slate-800"><span id="messagesCount">0</span> 条</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="dataPanel" class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+                <h2 id="panelTitle" class="text-base font-semibold text-slate-800">选择表格查看数据</h2>
+                <button id="refreshBtn" onclick="refreshData()" class="px-3 py-1.5 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1.5">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    刷新
+                </button>
+            </div>
+            <div id="tableContainer" class="overflow-x-auto scrollbar-thin" style="max-height: 500px;">
+                <div class="p-8 text-center text-slate-400">
+                    <svg class="w-12 h-12 mx-auto mb-3 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5"/>
+                    </svg>
+                    <p>点击上方卡片查看表格数据</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="deleteModal" class="hidden fixed inset-0 z-50">
+        <div class="absolute inset-0 bg-black/30" onclick="closeDeleteModal()"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-800">确认删除</h3>
+                        <p class="text-sm text-slate-500">此操作不可恢复</p>
+                    </div>
+                </div>
+                <p id="deleteMessage" class="text-sm text-slate-600 mb-4"></p>
+                <div class="flex gap-2">
+                    <button onclick="closeDeleteModal()" class="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                        取消
+                    </button>
+                    <button onclick="confirmDelete()" class="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors">
+                        删除
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTable = null;
+        let deleteTarget = null;
+
+        async function loadTables() {
+            try {
+                const response = await fetch('/api/database/tables');
+                const data = await response.json();
+                
+                if (data.success) {
+                    data.tables.forEach(table => {
+                        if (table.name === 'sessions') {
+                            document.getElementById('sessionsCount').textContent = table.rowCount;
+                        } else if (table.name === 'messages') {
+                            document.getElementById('messagesCount').textContent = table.rowCount;
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('加载表格信息失败:', error);
+            }
+        }
+
+        async function loadSessions() {
+            currentTable = 'sessions';
+            document.getElementById('panelTitle').textContent = '会话表';
+            highlightCard('sessionsCard');
+            
+            try {
+                const response = await fetch('/api/database/sessions');
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderSessionsTable(data.data);
+                }
+            } catch (error) {
+                console.error('加载会话数据失败:', error);
+            }
+        }
+
+        async function loadMessages(sessionId = null) {
+            currentTable = 'messages';
+            document.getElementById('panelTitle').textContent = sessionId ? `消息表 (会话: ${sessionId})` : '消息表';
+            highlightCard('messagesCard');
+            
+            try {
+                let url = '/api/database/messages';
+                if (sessionId) {
+                    url += '?sessionId=' + encodeURIComponent(sessionId);
+                }
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderMessagesTable(data.data);
+                }
+            } catch (error) {
+                console.error('加载消息数据失败:', error);
+            }
+        }
+
+        function highlightCard(cardId) {
+            document.querySelectorAll('[id$="Card"]').forEach(card => {
+                card.classList.remove('border-primary', 'bg-blue-50/50');
+            });
+            document.getElementById(cardId).classList.add('border-primary', 'bg-blue-50/50');
+        }
+
+        function renderSessionsTable(sessions) {
+            const container = document.getElementById('tableContainer');
+            
+            if (sessions.length === 0) {
+                container.innerHTML = '<div class="p-8 text-center text-slate-400">暂无数据</div>';
+                return;
+            }
+            
+            let html = `<table class="w-full text-sm">
+                <thead class="bg-slate-50 sticky top-0">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">ID</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">Session ID</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">状态</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">创建时间</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">更新时间</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">`;
+            
+            sessions.forEach(session => {
+                html += `<tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 text-slate-500">${escapeHtml(session.id || '')}</td>
+                    <td class="px-4 py-3">
+                        <span class="font-mono text-primary cursor-pointer hover:underline" onclick="loadMessages('${escapeHtml(session.sessionId || '')}')">${escapeHtml(session.sessionId || '')}</span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 text-xs rounded-full ${session.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}">${escapeHtml(session.status || '')}</span>
+                    </td>
+                    <td class="px-4 py-3 text-slate-500">${formatDate(session.createdAt)}</td>
+                    <td class="px-4 py-3 text-slate-500">${formatDate(session.updatedAt)}</td>
+                    <td class="px-4 py-3">
+                        <button onclick="showDeleteModal('session', '${escapeHtml(session.sessionId || '')}')" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+                    </td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function renderMessagesTable(messages) {
+            const container = document.getElementById('tableContainer');
+            
+            if (messages.length === 0) {
+                container.innerHTML = '<div class="p-8 text-center text-slate-400">暂无数据</div>';
+                return;
+            }
+            
+            let html = `<table class="w-full text-sm">
+                <thead class="bg-slate-50 sticky top-0">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">ID</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">Session ID</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">角色</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">内容</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">创建时间</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-600">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">`;
+            
+            messages.forEach(msg => {
+                const content = msg.content && msg.content.length > 50 ? msg.content.substring(0, 50) + '...' : msg.content;
+                const roleClass = msg.role === 'user' ? 'bg-blue-100 text-blue-700' : (msg.role === 'tool' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600');
+                
+                html += `<tr class="hover:bg-slate-50">
+                    <td class="px-4 py-3 text-slate-500">${msg.id}</td>
+                    <td class="px-4 py-3 font-mono text-slate-600 text-xs">${escapeHtml(msg.sessionId || '')}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 text-xs rounded-full ${roleClass}">${escapeHtml(msg.role || '')}</span>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600 max-w-xs truncate" title="${escapeHtml(msg.content || '')}">${escapeHtml(content || '')}</td>
+                    <td class="px-4 py-3 text-slate-500">${formatDate(msg.createdAt)}</td>
+                    <td class="px-4 py-3">
+                        <button onclick="showDeleteModal('message', ${msg.id})" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+                    </td>
+                </tr>`;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function showDeleteModal(type, id) {
+            deleteTarget = { type, id };
+            const message = type === 'session' 
+                ? `确定要删除会话 "${id}" 及其所有消息吗？`
+                : `确定要删除消息 #${id} 吗？`;
+            document.getElementById('deleteMessage').textContent = message;
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.add('hidden');
+            deleteTarget = null;
+        }
+
+        async function confirmDelete() {
+            if (!deleteTarget) return;
+            
+            try {
+                let url = deleteTarget.type === 'session' 
+                    ? `/api/database/sessions/${deleteTarget.id}`
+                    : `/api/database/messages/${deleteTarget.id}`;
+                
+                const response = await fetch(url, { method: 'DELETE' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    closeDeleteModal();
+                    refreshData();
+                }
+            } catch (error) {
+                console.error('删除失败:', error);
+            }
+        }
+
+        function refreshData() {
+            loadTables();
+            if (currentTable === 'sessions') {
+                loadSessions();
+            } else if (currentTable === 'messages') {
+                loadMessages();
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleString('zh-CN');
+            } catch {
+                return dateStr;
+            }
+        }
+
+        document.getElementById('sessionsCard').addEventListener('click', loadSessions);
+        document.getElementById('messagesCard').addEventListener('click', () => loadMessages());
+
+        loadTables();
+    </script>
+</body>
+</html>
