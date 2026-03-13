@@ -1,6 +1,6 @@
 package cc.ginpika.yuni.controller;
 
-
+import cc.ginpika.yuni.core.ChatResponse;
 import cc.ginpika.yuni.service.AgentContext;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +17,7 @@ public class TestController {
     AgentContext agentContext;
 
     @RequestMapping("/chat")
-    public String chat(@RequestParam String input) throws IOException {
+    public ChatResponse chat(@RequestParam String input) throws IOException {
         return agentContext.call(input);
     }
 }

@@ -9,9 +9,16 @@ import java.util.List;
 @Data
 @Slf4j
 public class YuniSession {
-    List<YuniMessage> messages = new ArrayList<>();
+    private String sessionId;
+    private List<YuniMessage> messages = new ArrayList<>();
+
+    public YuniSession() {
+    }
+
+    public YuniSession(String sessionId) {
+        this.sessionId = sessionId;
+    }
 
     public void reply(YuniReply msg) {
-
     }
 }

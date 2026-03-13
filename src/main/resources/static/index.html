@@ -19,7 +19,7 @@
     </script>
     <style>
         .chat-container {
-            height: calc(100vh - 160px);
+            height: calc(100vh - 200px);
         }
         .message-enter {
             animation: slideIn 0.2s ease-out;
@@ -104,6 +104,12 @@
         .json-number { color: #f59e0b; }
         .json-boolean { color: #a855f7; }
         .json-null { color: #94a3b8; }
+        .history-message {
+            opacity: 0.8;
+        }
+        .context-bar {
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen">
@@ -119,24 +125,43 @@
                     <h1 class="text-lg font-semibold text-slate-800">Yuni</h1>
                 </div>
             </div>
-            <button onclick="clearChat()" class="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1.5">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-                清空
-            </button>
+            <div class="flex items-center gap-2">
+                <button onclick="createNewSession()" class="px-3 py-1.5 text-sm text-primary hover:bg-blue-50 rounded-md transition-colors flex items-center gap-1.5">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    新对话
+                </button>
+                <button onclick="clearChat()" class="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1.5">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    清空
+                </button>
+            </div>
         </header>
 
-        <div id="chatContainer" class="chat-container overflow-y-auto scrollbar-thin bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-            <div class="flex items-start gap-2.5 message-enter">
-                <div class="w-7 h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
-                    <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+        <div class="bg-white rounded-xl border border-slate-200 px-4 py-2 mb-3">
+            <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
                     </svg>
+                    <span class="text-xs text-slate-500">上下文用量</span>
                 </div>
-                <div class="bg-slate-100 rounded-xl px-3.5 py-2.5 max-w-[80%]">
-                    <p class="text-slate-700 text-sm leading-relaxed">你好！我是 Yuni AI 助手，有什么可以帮助你的吗？</p>
-                </div>
+                <span id="usageText" class="text-xs text-slate-500">0 / 128000 tokens</span>
+            </div>
+            <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div id="usageBar" class="context-bar h-full bg-primary rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div id="chatContainer" class="chat-container overflow-y-auto scrollbar-thin bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+            <div class="flex items-center justify-center py-8 text-slate-400">
+                <svg class="w-5 h-5 mr-2 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                加载历史消息...
             </div>
         </div>
 
@@ -253,11 +278,14 @@
         const rememberChoice = document.getElementById('rememberChoice');
         const jsonModal = document.getElementById('jsonModal');
         const jsonContent = document.getElementById('jsonContent');
+        const usageBar = document.getElementById('usageBar');
+        const usageText = document.getElementById('usageText');
         
         let isLoading = false;
         let currentPermissionRequestId = null;
         let pendingPermissionResolve = null;
         let currentJsonData = null;
+        let currentSessionId = null;
 
         function autoResize(textarea) {
             textarea.style.height = 'auto';
@@ -310,9 +338,9 @@
             return String(obj);
         }
 
-        function addMessage(content, isUser = false, rawJson = null) {
+        function addMessage(content, isUser = false, rawResponse = null, isHistory = false) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = `flex items-start gap-2.5 message-enter ${isUser ? 'flex-row-reverse' : ''}`;
+            messageDiv.className = `flex items-start gap-2.5 message-enter ${isUser ? 'flex-row-reverse' : ''} ${isHistory ? 'history-message' : ''}`;
             
             const avatar = isUser 
                 ? `<div class="w-7 h-7 bg-slate-500 rounded-md flex items-center justify-center flex-shrink-0">
@@ -330,11 +358,11 @@
                 ? 'bg-primary text-white rounded-xl' 
                 : 'bg-slate-100 text-slate-700 rounded-xl';
             
-            const clickAttr = !isUser && rawJson 
-                ? `onclick="showJsonModal(${escapeAttr(JSON.stringify(rawJson))})" title="点击查看原始响应"` 
+            const clickAttr = !isUser && rawResponse 
+                ? `onclick="showJsonModal(this.dataset.raw)" data-raw="${escapeAttr(rawResponse)}" title="点击查看原始响应"` 
                 : '';
             
-            const indicator = !isUser && rawJson 
+            const indicator = !isUser && rawResponse 
                 ? `<div class="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-slate-200/50">
                      <svg class="w-3 h-3 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
@@ -356,16 +384,22 @@
         }
 
         function escapeAttr(text) {
-            return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            if (!text) return '';
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
 
-        function showJsonModal(jsonStr) {
+        function showJsonModal(rawResponse) {
             try {
-                const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+                let data = parseRawResponse(rawResponse);
                 currentJsonData = data;
                 jsonContent.innerHTML = formatJson(data);
             } catch (e) {
-                jsonContent.textContent = jsonStr;
+                jsonContent.textContent = rawResponse;
             }
             jsonModal.classList.remove('hidden');
         }
@@ -391,6 +425,24 @@
                         btn.innerHTML = originalText;
                     }, 1500);
                 });
+            }
+        }
+
+        function parseRawResponse(rawResponse) {
+            if (!rawResponse) return null;
+            
+            try {
+                let parsed = JSON.parse(rawResponse);
+                
+                if (typeof parsed === 'string') {
+                    try {
+                        parsed = JSON.parse(parsed);
+                    } catch (e) {}
+                }
+                
+                return parsed;
+            } catch (e) {
+                return rawResponse;
             }
         }
 
@@ -493,6 +545,69 @@
             }
         }
 
+        async function updateUsage() {
+            try {
+                const response = await fetch('/api/usage');
+                const data = await response.json();
+                
+                const percentage = Math.min(data.percentage, 100);
+                usageBar.style.width = percentage + '%';
+                usageText.textContent = `${data.currentTokens.toLocaleString()} / ${data.contextWindow.toLocaleString()} tokens`;
+                
+                if (percentage < 50) {
+                    usageBar.className = 'context-bar h-full bg-primary rounded-full';
+                } else if (percentage < 80) {
+                    usageBar.className = 'context-bar h-full bg-amber-500 rounded-full';
+                } else {
+                    usageBar.className = 'context-bar h-full bg-red-500 rounded-full';
+                }
+            } catch (error) {
+                console.error('获取用量失败:', error);
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const response = await fetch('/session/latest');
+                const data = await response.json();
+                
+                currentSessionId = data.sessionId;
+                
+                chatContainer.innerHTML = '';
+                
+                if (data.messages && data.messages.length > 0) {
+                    data.messages.forEach(msg => {
+                        const isUser = msg.role === 'user';
+                        addMessage(msg.content, isUser, msg.rawResponse, true);
+                    });
+                } else {
+                    addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false);
+                }
+                
+                updateUsage();
+            } catch (error) {
+                console.error('加载历史消息失败:', error);
+                chatContainer.innerHTML = '';
+                addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false);
+            }
+        }
+
+        async function createNewSession() {
+            try {
+                const response = await fetch('/session/create', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentSessionId = data.sessionId;
+                    chatContainer.innerHTML = '';
+                    addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false);
+                    updateUsage();
+                }
+            } catch (error) {
+                console.error('创建新会话失败:', error);
+            }
+        }
+
         async function sendMessage(message) {
             if (!message.trim() || isLoading) return;
             
@@ -507,46 +622,42 @@
                     throw new Error('Network response was not ok');
                 }
                 
-                const data = await response.text();
+                const data = await response.json();
                 
-                let replyMessage = data;
-                let jsonData = null;
+                let replyMessage = data.message || '无响应';
+                let rawResponse = data.rawResponse;
                 
-                try {
-                    const jsonMatch = data.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                        jsonData = JSON.parse(jsonMatch[0]);
-                        
-                        if (jsonData.need_permission) {
+                if (rawResponse) {
+                    const fullJson = parseRawResponse(rawResponse);
+                    if (fullJson?.choices?.[0]?.message?.content) {
+                        const content = fullJson.choices[0].message.content;
+                        const contentJson = parseRawResponse(content);
+                        if (contentJson?.need_permission) {
                             removeTypingIndicator();
-                            addMessage(`需要权限执行命令: ${jsonData.command}`, false, jsonData);
+                            addMessage(`需要权限执行命令: ${contentJson.command}`, false, null);
                             
-                            const result = await showPermissionModal(jsonData.command, jsonData.request_id);
+                            const result = await showPermissionModal(contentJson.command, contentJson.request_id);
                             
                             if (result.approved) {
                                 addTypingIndicator();
                                 await sendMessage(message);
                                 return;
                             } else {
-                                addMessage('权限被拒绝，命令未执行。', false);
+                                addMessage('权限被拒绝，命令未执行。', false, null);
                                 setLoading(false);
                                 userInput.focus();
                                 return;
                             }
                         }
-                        
-                        if (jsonData.message) {
-                            replyMessage = jsonData.message;
-                        }
                     }
-                } catch (e) {
                 }
                 
                 removeTypingIndicator();
-                addMessage(replyMessage, false, jsonData || { raw: data });
+                addMessage(replyMessage, false, rawResponse);
+                updateUsage();
             } catch (error) {
                 removeTypingIndicator();
-                addMessage('抱歉，发生了错误：' + error.message, false, { error: error.message });
+                addMessage('抱歉，发生了错误：' + error.message, false, null);
             } finally {
                 setLoading(false);
                 userInput.focus();
@@ -554,18 +665,8 @@
         }
 
         function clearChat() {
-            chatContainer.innerHTML = `
-                <div class="flex items-start gap-2.5 message-enter">
-                    <div class="w-7 h-7 bg-primary rounded-md flex items-center justify-center flex-shrink-0">
-                        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                        </svg>
-                    </div>
-                    <div class="bg-slate-100 rounded-xl px-3.5 py-2.5 max-w-[80%]">
-                        <p class="text-slate-700 text-sm leading-relaxed">你好！我是 Yuni AI 助手，有什么可以帮助你的吗？</p>
-                    </div>
-                </div>
-            `;
+            chatContainer.innerHTML = '';
+            addMessage('你好！我是 Yuni AI 助手，有什么可以帮助你的吗？', false, null, false);
         }
 
         chatForm.addEventListener('submit', (e) => {
@@ -578,6 +679,7 @@
             }
         });
 
+        loadHistory();
         userInput.focus();
     </script>
 </body>

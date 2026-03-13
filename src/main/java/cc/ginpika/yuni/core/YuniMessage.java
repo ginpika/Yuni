@@ -8,6 +8,7 @@ import lombok.Data;
 public class YuniMessage {
     String role;
     String content;
+    String rawResponse;
 
     public String toJsonString() {
         return "{ \"role\": %s, \"message\": %s}".formatted(role, content);
