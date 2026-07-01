@@ -1,3 +1,5 @@
+![Yuni](./Yuni.jpg)
+
 # Yuni
 
 A OpenClaw like Agent | Based on Spring Boot | Java developer friendly

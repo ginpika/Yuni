@@ -26,10 +26,9 @@ public class OpenAIClient {
 
     public String call(String requestBody) throws IOException {
         Request request = new Request.Builder()
-                .url("https://coding.dashscope.aliyuncs.com/v1/chat/completions")
+                .url(apiConfig.getBaseUrl())
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Authorization", "Bearer " + apiConfig.getApiKey())
-                .addHeader("User-Agent", "openclaw")
                 .post(RequestBody.create(requestBody.getBytes(StandardCharsets.UTF_8)))
                 .build();
 

@@ -1,6 +1,7 @@
 package cc.ginpika.yuni.tool;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.Getter;
 
@@ -25,11 +26,11 @@ public abstract class AbstractTool implements Tool {
         }
         String[] required = getRequiredParameters();
         if (required != null && required.length > 0) {
-            ObjectNode requiredNode = objectMapper.createObjectNode();
+            ArrayNode requiredArray = objectMapper.createArrayNode();
             for (String param : required) {
-                requiredNode.put(param, true);
+                requiredArray.add(param);
             }
-            schema.set("required", requiredNode);
+            schema.set("required", requiredArray);
         }
         return schema;
     }
@@ -52,11 +53,11 @@ public abstract class AbstractTool implements Tool {
     protected ObjectNode createProperty(String type, String description, String[] enumValues) {
         ObjectNode prop = createProperty(type, description);
         if (enumValues != null && enumValues.length > 0) {
-            ObjectNode enumNode = objectMapper.createObjectNode();
+            ArrayNode enumArray = objectMapper.createArrayNode();
             for (String value : enumValues) {
-                enumNode.put(value, value);
+                enumArray.add(value);
             }
-            prop.set("enum", enumNode);
+            prop.set("enum", enumArray);
         }
         return prop;
     }

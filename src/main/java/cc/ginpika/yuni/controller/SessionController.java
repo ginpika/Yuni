@@ -1,6 +1,5 @@
 package cc.ginpika.yuni.controller;
 
-import cc.ginpika.yuni.core.YuniMessage;
 import cc.ginpika.yuni.core.YuniSession;
 import cc.ginpika.yuni.entity.MessageEntity;
 import cc.ginpika.yuni.entity.SessionEntity;

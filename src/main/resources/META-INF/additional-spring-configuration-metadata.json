@@ -1,0 +1,39 @@
+{
+  "properties": [
+    {
+      "name": "yuni.tavily-api-key",
+      "type": "java.lang.String",
+      "description": "A description for 'yuni.tavily-api-key'"
+    },
+    {
+      "name": "yuni.workspace",
+      "type": "java.lang.String",
+      "description": "A description for 'yuni.workspace'"
+    },
+    {
+      "name": "yuni.max-tokens",
+      "type": "java.lang.String",
+      "description": "A description for 'yuni.max-tokens'"
+    },
+    {
+      "name": "yuni.context-window",
+      "type": "java.lang.String",
+      "description": "A description for 'yuni.context-window'"
+    },
+    {
+      "name": "yuni.model",
+      "type": "java.lang.String",
+      "description": "A description for 'yuni.model'"
+    },
+    {
+      "name": "yuni.api-key",
+      "type": "java.lang.String",
+      "description": "A description for 'yuni.api-key'"
+    },
+    {
+      "name": "yuni.base-url",
+      "type": "java.lang.String",
+      "description": "A description for 'yuni.base-url'"
+    }
+  ]
+}

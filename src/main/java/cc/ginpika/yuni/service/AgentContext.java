@@ -5,6 +5,7 @@ import cc.ginpika.yuni.core.ChatResponse;
 import cc.ginpika.yuni.core.YuniMessage;
 import cc.ginpika.yuni.core.YuniReply;
 import cc.ginpika.yuni.core.YuniSession;
+import cc.ginpika.yuni.entity.PromptConfig;
 import cc.ginpika.yuni.entity.SessionEntity;
 import cc.ginpika.yuni.tool.ToolExecutor;
 import cc.ginpika.yuni.tool.ToolRegistry;
@@ -35,6 +36,8 @@ public class AgentContext {
     ToolExecutor toolExecutor;
     @Resource
     ToolNotificationService toolNotificationService;
+    @Resource
+    PromptConfigService promptConfigService;
 
     ObjectMapper objectMapper = new ObjectMapper();
 
@@ -188,10 +191,10 @@ public class AgentContext {
 
     public String buildRequestBody(YuniSession session) {
         ObjectNode request = objectMapper.createObjectNode();
-        request.put("model", "glm-5");
+        request.put("model", apiConfig.getModel());
         ArrayNode messages = objectMapper.createArrayNode();
         
-        injectSystemPrompt(messages);
+        injectCustomPrompts(messages);
         
         session.getMessages().forEach(msg -> {
             ObjectNode raw = objectMapper.createObjectNode();
@@ -206,9 +209,10 @@ public class AgentContext {
         return request.toString();
     }
 
+    // just 4 test
     public static String buildRequestBody(YuniSession session, ObjectMapper objectMapper) {
         ObjectNode request = objectMapper.createObjectNode();
-        request.put("model", "glm-5");
+        request.put("model", "your-model");
         ArrayNode messages = objectMapper.createArrayNode();
         injectSystemPrompt(messages, objectMapper);
         session.getMessages().forEach(msg -> {
@@ -233,6 +237,31 @@ public class AgentContext {
         raw.put("role", "system");
         raw.put("content", SYSTEM_PROMPT);
         message.add(raw);
+    }
+
+    public void injectCustomPrompts(ArrayNode messages) {
+        PromptConfig config = promptConfigService.getConfig();
+        
+        if (config != null && config.getEnabled()) {
+            // 先注入系统提示词
+            if (config.getSystemPrompt() != null && !config.getSystemPrompt().isEmpty()) {
+                ObjectNode systemMsg = objectMapper.createObjectNode();
+                systemMsg.put("role", "system");
+                systemMsg.put("content", config.getSystemPrompt());
+                messages.add(systemMsg);
+            }
+            
+            // 再注入人格提示词（也是system角色）
+            if (config.getPersonalityPrompt() != null && !config.getPersonalityPrompt().isEmpty()) {
+                ObjectNode personalityMsg = objectMapper.createObjectNode();
+                personalityMsg.put("role", "system");
+                personalityMsg.put("content", config.getPersonalityPrompt());
+                messages.add(personalityMsg);
+            }
+        } else {
+            // 如果没有自定义配置，使用默认的系统提示词
+            injectSystemPrompt(messages);
+        }
     }
 
     public void injectToolFunctions(ObjectNode request) {
